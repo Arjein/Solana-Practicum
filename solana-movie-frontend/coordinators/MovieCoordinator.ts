@@ -1,24 +1,31 @@
 import bs58 from "bs58"
 import * as web3 from "@solana/web3.js"
 import { Movie } from "../models/Movie"
-
-const MOVIE_REVIEW_PROGRAM_ID = "BNU4WMofFddN8wTKGSm67wapnHfnBqx8BQDZswZwZTf3"
+import { MOVIE_REVIEW_PROGRAM_ID } from "../utils/constants"
 
 export class MovieCoordinator {
     static accounts: web3.PublicKey[] = []
 
     static async prefetchAccounts(connection: web3.Connection, search: string) {
+        const offset = 4 + 6 + 1 + 32 + 1 + 4
         const accounts = await connection.getProgramAccounts(
             new web3.PublicKey(MOVIE_REVIEW_PROGRAM_ID),
             {
-                dataSlice: { offset: 2, length: 18 },
+                dataSlice: { offset: 0, length: offset + 20 },
                 filters:
                     search === ""
-                        ? []
+                        ? [
+                              {
+                                  memcmp: {
+                                      offset: 4,
+                                      bytes: bs58.encode(Buffer.from("review")),
+                                  },
+                              },
+                          ]
                         : [
                               {
                                   memcmp: {
-                                      offset: 6,
+                                      offset: offset,
                                       bytes: bs58.encode(Buffer.from(search)),
                                   },
                               },
@@ -29,8 +36,8 @@ export class MovieCoordinator {
         accounts.sort((a, b) => {
             const lengthA = a.account.data.readUInt32LE(0)
             const lengthB = b.account.data.readUInt32LE(0)
-            const dataA = a.account.data.slice(4, 4 + lengthA)
-            const dataB = b.account.data.slice(4, 4 + lengthB)
+            const dataA = a.account.data.slice(offset, offset + lengthA)
+            const dataB = b.account.data.slice(offset, offset + lengthB)
             return dataA.compare(dataB)
         })
 
